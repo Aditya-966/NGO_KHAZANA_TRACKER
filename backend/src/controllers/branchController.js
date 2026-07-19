@@ -54,4 +54,25 @@ async function deleteBranch(req, res, next) {
   }
 }
 
-module.exports = { createBranch, listBranches, deleteBranch };
+const resetPasswordSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters."),
+});
+
+async function resetBranchPassword(req, res, next) {
+  try {
+    const { newPassword } = resetPasswordSchema.parse(req.body);
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    const branch = await prisma.branch.update({
+      where: { id: req.params.id },
+      data: { passwordHash },
+      select: { id: true, name: true, loginId: true },
+    });
+
+    return res.json({ success: true, branch });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { createBranch, listBranches, deleteBranch, resetBranchPassword };
