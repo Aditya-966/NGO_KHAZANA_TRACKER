@@ -62,4 +62,29 @@ async function verifyBranchPassword(req, res, next) {
   }
 }
 
-module.exports = { centralLogin, branchLogin, verifyBranchPassword };
+// Central changes its own password (must know the current one).
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(6, "New password must be at least 6 characters."),
+});
+
+async function changeCentralPassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+ 
+    const admin = await prisma.centralAdmin.findUnique({ where: { id: req.user.sub } });
+    if (!admin) return res.status(404).json({ error: "Central account not found." });
+
+    const ok = await bcrypt.compare(currentPassword, admin.passwordHash);
+    if (!ok) return res.status(401).json({ error: "Current password is incorrect." });
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.centralAdmin.update({ where: { id: admin.id }, data: { passwordHash } });
+
+    return res.json({ success: true });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { centralLogin, branchLogin, verifyBranchPassword, changeCentralPassword };
