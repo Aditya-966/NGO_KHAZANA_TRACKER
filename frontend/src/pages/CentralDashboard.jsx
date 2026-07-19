@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Landmark, Building2, BookOpen, Plus, Users, Download, Trash2, LogOut, X, Wallet, Layers } from "lucide-react";
+import { Landmark, Building2, BookOpen, Plus, Users, Download, Trash2, LogOut, X, Wallet, Layers, KeyRound } from "lucide-react";
 import { Btn, Field, inputClass, StampBadge, fmtDate, fmtMoney, Card, StatCard, useToast } from "../components/ui";
-import { branchApi, ledgerApi, exportApi, downloadBlob } from "../api/endpoints";
+import { branchApi, ledgerApi, exportApi, authApi, downloadBlob } from "../api/endpoints";
 import { useAuth } from "../context/AuthContext";
 
 export default function CentralDashboard() {
@@ -19,6 +19,17 @@ export default function CentralDashboard() {
   const [filterBranch, setFilterBranch] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [loadingLedger, setLoadingLedger] = useState(false);
+
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [curPw, setCurPw] = useState("");
+  const [newCentralPw, setNewCentralPw] = useState("");
+  const [changePwErr, setChangePwErr] = useState("");
+  const [changingPw, setChangingPw] = useState(false);
+
+  const [resetBranchTarget, setResetBranchTarget] = useState(null); // { id, name }
+  const [resetPwValue, setResetPwValue] = useState("");
+  const [resetPwErr, setResetPwErr] = useState("");
+  const [resettingPw, setResettingPw] = useState(false);
 
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -96,6 +107,45 @@ export default function CentralDashboard() {
     navigate("/");
   }
 
+  async function submitChangePassword() {
+    setChangePwErr("");
+    if (!curPw || !newCentralPw) {
+      setChangePwErr("Both fields are required.");
+      return;
+    }
+    setChangingPw(true);
+    try {
+      await authApi.changeCentralPassword(curPw, newCentralPw);
+      toast("Central password updated.", "success");
+      setShowChangePw(false);
+      setCurPw("");
+      setNewCentralPw("");
+    } catch (err) {
+      setChangePwErr(err.response?.data?.error || "Could not change password.");
+    } finally {
+      setChangingPw(false);
+    }
+  }
+
+  async function submitResetBranchPassword() {
+    setResetPwErr("");
+    if (!resetPwValue || resetPwValue.length < 6) {
+      setResetPwErr("Password must be at least 6 characters.");
+      return;
+    }
+    setResettingPw(true);
+    try {
+      await branchApi.resetPassword(resetBranchTarget.id, resetPwValue);
+      toast(`Password reset for "${resetBranchTarget.name}".`, "success");
+      setResetBranchTarget(null);
+      setResetPwValue("");
+    } catch (err) {
+      setResetPwErr(err.response?.data?.error || "Could not reset password.");
+    } finally {
+      setResettingPw(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-paper">
       <header className="bg-ink text-paper px-6 py-4 flex items-center justify-between">
@@ -103,9 +153,14 @@ export default function CentralDashboard() {
           <Landmark size={20} />
           <span className="font-serif text-lg">Central Office</span>
         </div>
-        <Btn variant="ghost" onClick={handleLogout} className="!border-paper/40 !text-paper hover:!bg-white/10">
-          <LogOut size={14} /> Logout
-        </Btn>
+        <div className="flex items-center gap-2">
+          <Btn variant="ghost" onClick={() => setShowChangePw(true)} className="!border-paper/40 !text-paper hover:!bg-white/10">
+            <KeyRound size={14} /> Change Password
+          </Btn>
+          <Btn variant="ghost" onClick={handleLogout} className="!border-paper/40 !text-paper hover:!bg-white/10">
+            <LogOut size={14} /> Logout
+          </Btn>
+        </div>
       </header>
 
       <nav className="bg-[#EFE6D0] border-b border-border px-6 flex gap-1">
@@ -169,6 +224,13 @@ export default function CentralDashboard() {
                       </p>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => setResetBranchTarget({ id: b.id, name: b.name })}
+                        title="Reset branch password"
+                        className="p-2 rounded-sm hover:bg-[#EFE6D0] text-gold"
+                      >
+                        <KeyRound size={16} />
+                      </button>
                       <button onClick={() => exportBranch(b.id, b.loginId)} title="Download branch Excel" className="p-2 rounded-sm hover:bg-[#EFE6D0] text-ink">
                         <Download size={16} />
                       </button>
@@ -254,6 +316,110 @@ export default function CentralDashboard() {
           </div>
         )}
       </main>
+
+      {showChangePw && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-[fadeSlideIn_0.15s_ease-out]">
+          <div className="bg-card border-2 border-ink rounded-md max-w-sm w-full p-6 shadow-xl animate-[modalPop_0.2s_ease-out]">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 rounded-sm bg-ink/10 flex items-center justify-center">
+                <KeyRound size={18} className="text-ink" />
+              </div>
+              <h3 className="font-serif text-lg text-ink">Change Central Password</h3>
+            </div>
+            <Field label="Current Password">
+              <input
+                type="password"
+                autoFocus
+                className={inputClass}
+                value={curPw}
+                onChange={(e) => {
+                  setCurPw(e.target.value);
+                  setChangePwErr("");
+                }}
+              />
+            </Field>
+            <Field label="New Password">
+              <input
+                type="password"
+                className={inputClass}
+                value={newCentralPw}
+                onChange={(e) => {
+                  setNewCentralPw(e.target.value);
+                  setChangePwErr("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && submitChangePassword()}
+              />
+            </Field>
+            {changePwErr && <p className="text-xs text-red font-mono mb-2">{changePwErr}</p>}
+            <div className="flex gap-2 mt-3">
+              <Btn
+                variant="ghost"
+                className="flex-1"
+                disabled={changingPw}
+                onClick={() => {
+                  setShowChangePw(false);
+                  setCurPw("");
+                  setNewCentralPw("");
+                  setChangePwErr("");
+                }}
+              >
+                Cancel
+              </Btn>
+              <Btn variant="primary" className="flex-1" onClick={submitChangePassword} disabled={changingPw}>
+                {changingPw ? "Saving…" : "Update Password"}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetBranchTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-[fadeSlideIn_0.15s_ease-out]">
+          <div className="bg-card border-2 border-gold rounded-md max-w-sm w-full p-6 shadow-xl animate-[modalPop_0.2s_ease-out]">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 rounded-sm bg-gold/15 flex items-center justify-center">
+                <KeyRound size={18} className="text-gold" />
+              </div>
+              <h3 className="font-serif text-lg text-ink">Reset Password — {resetBranchTarget.name}</h3>
+            </div>
+            <p className="text-sm text-textMuted font-serif mb-3">
+              This immediately replaces the branch's password. Share the new one with the branch head securely.
+            </p>
+            <Field label="New Branch Password">
+              <input
+                type="text"
+                autoFocus
+                className={inputClass}
+                value={resetPwValue}
+                onChange={(e) => {
+                  setResetPwValue(e.target.value);
+                  setResetPwErr("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && submitResetBranchPassword()}
+                placeholder="At least 6 characters"
+              />
+            </Field>
+            {resetPwErr && <p className="text-xs text-red font-mono mb-2">{resetPwErr}</p>}
+            <div className="flex gap-2 mt-3">
+              <Btn
+                variant="ghost"
+                className="flex-1"
+                disabled={resettingPw}
+                onClick={() => {
+                  setResetBranchTarget(null);
+                  setResetPwValue("");
+                  setResetPwErr("");
+                }}
+              >
+                Cancel
+              </Btn>
+              <Btn variant="gold" className="flex-1" onClick={submitResetBranchPassword} disabled={resettingPw}>
+                {resettingPw ? "Saving…" : "Reset Password"}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
