@@ -4,12 +4,15 @@ export const authApi = {
   centralLogin: (loginId, password) => client.post("/auth/central/login", { loginId, password }),
   branchLogin: (loginId, password) => client.post("/auth/branch/login", { loginId, password }),
   verifyBranchPassword: (password) => client.post("/auth/branch/verify-password", { password }),
+  changeCentralPassword: (currentPassword, newPassword) =>
+    client.post("/auth/central/change-password", { currentPassword, newPassword }),
 };
 
 export const branchApi = {
   create: (data) => client.post("/branches", data),
   list: () => client.get("/branches"),
   remove: (id) => client.delete(`/branches/${id}`),
+  resetPassword: (id, newPassword) => client.patch(`/branches/${id}/password`, { newPassword }),
 };
 
 export const studentApi = {
