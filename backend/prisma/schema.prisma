@@ -1,0 +1,72 @@
+// Prisma schema for the NGO multi-branch student ledger system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+model CentralAdmin {
+  id           String   @id @default(cuid())
+  loginId      String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Branch {
+  id           String   @id @default(cuid())
+  name         String
+  loginId      String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  students     Student[]
+  transactions Transaction[]
+}
+
+model Student {
+  id         String   @id @default(cuid())
+  accNo      String
+  name       String
+  dob        DateTime
+  fatherName String
+  pollNo     String
+  createdAt  DateTime @default(now())
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  transactions Transaction[]
+
+  // Account number and poll number each only need to be unique within a
+  // branch, not globally — this lets a student be looked up by either one.
+  @@unique([branchId, accNo])
+  @@unique([branchId, pollNo])
+  @@index([branchId])
+}
+
+model Transaction {
+  id        String           @id @default(cuid())
+  type      TransactionType
+  amount    Decimal          @db.Decimal(12, 2)
+  date      DateTime         @db.Date
+  createdAt DateTime         @default(now())
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([branchId, date])
+  @@index([studentId])
+}
