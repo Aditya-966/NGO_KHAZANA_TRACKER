@@ -26,18 +26,35 @@ async function addTransaction(req, res, next) {
     });
     if (!student) return res.status(404).json({ error: "No student found with this account number in your branch." });
 
-    const transaction = await prisma.transaction.create({
-      data: {
-        type: data.type,
-        amount: data.amount,
-        date: new Date(data.date),
-        studentId: student.id,
-        branchId: req.user.branchId,
-      },
-      include: { student: true },
+    // Everything below runs as one atomic DB transaction: the student's
+    // running balance is updated by +amount (credit) or -amount (debit),
+    // and that resulting balance is stamped onto the ledger row itself —
+    // so every entry shows exactly what the balance was right after it,
+    // like a real passbook, while the full history of entries is still kept.
+    const signedAmount = data.type === "CREDIT" ? data.amount : -data.amount;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedStudent = await tx.student.update({
+        where: { id: student.id },
+        data: { balance: { increment: signedAmount } },
+      });
+
+      const transaction = await tx.transaction.create({
+        data: {
+          type: data.type,
+          amount: data.amount,
+          date: new Date(data.date),
+          balanceAfter: updatedStudent.balance,
+          studentId: student.id,
+          branchId: req.user.branchId,
+        },
+        include: { student: true },
+      });
+
+      return { transaction, student: updatedStudent };
     });
 
-    return res.status(201).json(transaction);
+    return res.status(201).json(result.transaction);
   } catch (err) {
     return next(err);
   }
