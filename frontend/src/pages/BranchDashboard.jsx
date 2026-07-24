@@ -105,10 +105,11 @@ export default function BranchDashboard() {
     setConfirming(true);
     setConfirmErr("");
     try {
-      await transactionApi.add({ ...pendingTx, password });
+      const { data } = await transactionApi.add({ ...pendingTx, password });
       setPendingTx(null);
       setTxAmount("");
-      toast(`${pendingTx.type === "CREDIT" ? "Credit" : "Debit"} of ${fmtMoney(pendingTx.amount)} recorded.`, "success");
+      setFoundStudent((prev) => (prev ? { ...prev, balance: data.student.balance } : prev));
+      toast(`${pendingTx.type === "CREDIT" ? "Credit" : "Debit"} of ${fmtMoney(pendingTx.amount)} recorded. New balance: ${fmtMoney(data.student.balance)}`, "success");
       if (tab === "ledger") loadLedger();
     } catch (err) {
       setConfirmErr(err.response?.data?.error || "Could not save entry.");
@@ -214,10 +215,20 @@ export default function BranchDashboard() {
 
             {foundStudent && (
               <div className="bg-paper border border-borderLight rounded-sm p-4 mb-4">
-                <p className="font-serif text-text text-lg">{foundStudent.name}</p>
-                <p className="text-xs font-mono text-muted mt-1">
-                  Acc No: {foundStudent.accNo} · DOB: {fmtDate(foundStudent.dob)} · Father: {foundStudent.fatherName} · Poll No: {foundStudent.pollNo}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-serif text-text text-lg">{foundStudent.name}</p>
+                    <p className="text-xs font-mono text-muted mt-1">
+                      Acc No: {foundStudent.accNo} · DOB: {fmtDate(foundStudent.dob)} · Father: {foundStudent.fatherName} · Poll No: {foundStudent.pollNo}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-mono uppercase tracking-widest text-muted">Current Balance</p>
+                    <p className={`font-serif text-xl ${Number(foundStudent.balance) >= 0 ? "text-green" : "text-red"}`}>
+                      {fmtMoney(foundStudent.balance)}
+                    </p>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-4">
                   <Field label="Type">
@@ -272,6 +283,7 @@ export default function BranchDashboard() {
                     <th className="py-2 pr-3">Student</th>
                     <th className="py-2 pr-3">Type</th>
                     <th className="py-2 pr-3 text-right">Amount</th>
+                    <th className="py-2 pr-3 text-right">Balance After</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -284,11 +296,12 @@ export default function BranchDashboard() {
                         <StampBadge tone={t.type === "CREDIT" ? "green" : "red"}>{t.type === "CREDIT" ? "Credit" : "Debit"}</StampBadge>
                       </td>
                       <td className="py-2 pr-3 text-right font-mono">{fmtMoney(t.amount)}</td>
+                      <td className="py-2 pr-3 text-right font-mono text-muted">{fmtMoney(t.balanceAfter)}</td>
                     </tr>
                   ))}
                   {ledgerRows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-muted font-serif">
+                      <td colSpan={6} className="text-center py-8 text-muted font-serif">
                         No entries yet.
                       </td>
                     </tr>
