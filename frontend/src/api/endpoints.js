@@ -11,7 +11,7 @@ export const authApi = {
 export const branchApi = {
   create: (data) => client.post("/branches", data),
   list: () => client.get("/branches"),
-  remove: (id) => client.delete(`/branches/${id}`),
+  remove: (id, password) => client.delete(`/branches/${id}`, { data: { password } }),
   resetPassword: (id, newPassword) => client.patch(`/branches/${id}/password`, { newPassword }),
 };
 
