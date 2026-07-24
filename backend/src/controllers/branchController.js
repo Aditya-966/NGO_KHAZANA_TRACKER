@@ -45,8 +45,16 @@ async function listBranches(req, res, next) {
   }
 }
 
+const deleteSchema = z.object({ password: z.string().min(1, "Password is required to delete a branch.") });
+
 async function deleteBranch(req, res, next) {
   try {
+    const { password } = deleteSchema.parse(req.body);
+
+    const admin = await prisma.centralAdmin.findUnique({ where: { id: req.user.sub } });
+    const ok = await bcrypt.compare(password, admin.passwordHash);
+    if (!ok) return res.status(401).json({ error: "Incorrect password. Branch not deleted." });
+
     await prisma.branch.delete({ where: { id: req.params.id } });
     return res.status(204).send();
   } catch (err) {
