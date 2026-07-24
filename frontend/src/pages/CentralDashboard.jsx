@@ -31,6 +31,11 @@ export default function CentralDashboard() {
   const [resetPwErr, setResetPwErr] = useState("");
   const [resettingPw, setResettingPw] = useState(false);
 
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
+  const [deletePwValue, setDeletePwValue] = useState("");
+  const [deletePwErr, setDeletePwErr] = useState("");
+  const [deletingBranch, setDeletingBranch] = useState(false);
+
   const { logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -83,11 +88,24 @@ export default function CentralDashboard() {
     }
   }
 
-  async function removeBranch(id) {
-    if (!window.confirm("Remove this branch? Its students and transactions will be deleted too.")) return;
-    await branchApi.remove(id);
-    await loadBranches();
-    toast("Branch removed.", "success");
+  async function submitDeleteBranch() {
+    setDeletePwErr("");
+    if (!deletePwValue) {
+      setDeletePwErr("Enter your central password to confirm.");
+      return;
+    }
+    setDeletingBranch(true);
+    try {
+      await branchApi.remove(deleteTarget.id, deletePwValue);
+      await loadBranches();
+      toast(`Branch "${deleteTarget.name}" removed.`, "success");
+      setDeleteTarget(null);
+      setDeletePwValue("");
+    } catch (err) {
+      setDeletePwErr(err.response?.data?.error || "Could not delete branch.");
+    } finally {
+      setDeletingBranch(false);
+    }
   }
 
   async function exportCentral() {
@@ -234,7 +252,7 @@ export default function CentralDashboard() {
                       <button onClick={() => exportBranch(b.id, b.loginId)} title="Download branch Excel" className="p-2 rounded-sm hover:bg-[#EFE6D0] text-ink">
                         <Download size={16} />
                       </button>
-                      <button onClick={() => removeBranch(b.id)} title="Remove branch" className="p-2 rounded-sm hover:bg-[#EFE6D0] text-red">
+                      <button onClick={() => setDeleteTarget({ id: b.id, name: b.name })} title="Remove branch" className="p-2 rounded-sm hover:bg-[#EFE6D0] text-red">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -288,6 +306,7 @@ export default function CentralDashboard() {
                     <th className="py-2 pr-3">Student</th>
                     <th className="py-2 pr-3">Type</th>
                     <th className="py-2 pr-3 text-right">Amount</th>
+                    <th className="py-2 pr-3 text-right">Balance After</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -301,11 +320,12 @@ export default function CentralDashboard() {
                         <StampBadge tone={r.type === "CREDIT" ? "green" : "red"}>{r.type === "CREDIT" ? "Credit" : "Debit"}</StampBadge>
                       </td>
                       <td className="py-2 pr-3 text-right font-mono">{fmtMoney(r.amount)}</td>
+                      <td className="py-2 pr-3 text-right font-mono text-muted">{fmtMoney(r.balanceAfter)}</td>
                     </tr>
                   ))}
                   {!loadingLedger && rows.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-muted font-serif">
+                      <td colSpan={7} className="text-center py-8 text-muted font-serif">
                         No entries match this filter.
                       </td>
                     </tr>
@@ -415,6 +435,53 @@ export default function CentralDashboard() {
               </Btn>
               <Btn variant="gold" className="flex-1" onClick={submitResetBranchPassword} disabled={resettingPw}>
                 {resettingPw ? "Saving…" : "Reset Password"}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-[fadeSlideIn_0.15s_ease-out]">
+          <div className="bg-card border-2 border-red rounded-md max-w-sm w-full p-6 shadow-xl animate-[modalPop_0.2s_ease-out]">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 rounded-sm bg-red/10 flex items-center justify-center">
+                <Trash2 size={18} className="text-red" />
+              </div>
+              <h3 className="font-serif text-lg text-ink">Delete "{deleteTarget.name}"?</h3>
+            </div>
+            <p className="text-sm text-textMuted font-serif mb-3">
+              This permanently deletes the branch along with all its students and transactions. Enter your central
+              password to confirm.
+            </p>
+            <Field label="Central Password">
+              <input
+                type="password"
+                autoFocus
+                className={inputClass}
+                value={deletePwValue}
+                onChange={(e) => {
+                  setDeletePwValue(e.target.value);
+                  setDeletePwErr("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && submitDeleteBranch()}
+              />
+            </Field>
+            {deletePwErr && <p className="text-xs text-red font-mono mb-2">{deletePwErr}</p>}
+            <div className="flex gap-2 mt-3">
+              <Btn
+                variant="ghost"
+                className="flex-1"
+                disabled={deletingBranch}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeletePwValue("");
+                  setDeletePwErr("");
+                }}
+              >
+                Cancel
+              </Btn>
+              <Btn variant="red" className="flex-1" onClick={submitDeleteBranch} disabled={deletingBranch}>
+                {deletingBranch ? "Deleting…" : "Delete Branch"}
               </Btn>
             </div>
           </div>
