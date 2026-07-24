@@ -9,6 +9,7 @@ const COLUMNS = [
   { header: "Poll No", key: "pollNo", width: 12 },
   { header: "Type", key: "type", width: 10 },
   { header: "Amount (₹)", key: "amount", width: 14 },
+  { header: "Balance After (₹)", key: "balanceAfter", width: 18 },
 ];
 
 function styleHeader(sheet) {
@@ -42,6 +43,7 @@ function addLedgerSheet(workbook, sheetName, transactions) {
       pollNo: t.student.pollNo,
       type: t.type === "CREDIT" ? "Credit" : "Debit",
       amount: signedAmount,
+      balanceAfter: Number(t.balanceAfter),
     });
   }
 
